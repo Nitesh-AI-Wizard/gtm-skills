@@ -145,20 +145,22 @@ The script:
 
 ## Step 4: Logo extraction from screenshots (bonus signal)
 
-Full-page screenshots are captured on every homepage scrape ($0 extra credit).
-After scraping completes, Claude Code can read the screenshot to identify logos.
+The script attempts a full-page screenshot on every homepage scrape ($0 extra
+credit when it works). If the screenshot engine (chrome-cdp) fails, it retries
+with markdown-only — no content is lost.
 
 **How it works:**
-1. Read the JSON scan files — check for `screenshot` field in homepage page data
-2. Read the full-page screenshot using Claude Code's built-in image capability ($0 extra on Max plan)
-3. Identify company logos in "Trusted by...", "Backed by...", "Our Partners" grids
-4. Write detected company names back to the Sheet
+1. Homepage scrape includes `full_page=True` screenshot request
+2. If chrome-cdp engine succeeds → screenshot URL saved in JSON + Sheet
+3. If chrome-cdp fails → automatic fallback to markdown-only (costs 1 extra credit for the failed attempt)
+4. After scraping, Claude Code can read the screenshot to identify company logos in "Trusted by...", "Backed by...", "Our Partners" grids
 
-**Key difference from before:** Uses `full_page=True` so the entire page is captured,
-not just the top viewport. Logo grids are typically below the fold.
+**Key detail:** Uses `full_page=True` so the entire page is captured (e.g. 1920x14727px),
+not just the top viewport (~900px). Logo grids are typically below the fold.
 
-**Availability:** ~60-70% of B2B SaaS sites have logo grids. Skip when not
-found — this is a bonus signal, not a guaranteed output.
+**Availability:** Screenshots work on ~20-30% of sites. Most sites block the
+chrome-cdp browser engine needed for rendering. This is a bonus signal, not
+a guaranteed output. The fallback ensures content is always captured.
 
 **Note:** Screenshot URLs expire after 24 hours. Process them same-day or save
 the images locally.
