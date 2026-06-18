@@ -107,7 +107,6 @@ def build_rows(scans: list[dict], mode: str, full_content: bool = True) -> tuple
         header += [f.replace("_", " ").title() for f in EXTRACT_FIELDS]
     else:
         header += [pt.replace("_", " ").title() for pt in page_types]
-        header.append("Screenshot")
 
     # Data rows
     rows = []
@@ -145,10 +144,6 @@ def build_rows(scans: list[dict], mode: str, full_content: bool = True) -> tuple
                         row.append(f"[{len(content)} chars]\n{summary}")
                     else:
                         row.append("")
-
-            # Screenshot URL from homepage
-            homepage_data = pages.get("homepage", {})
-            row.append(homepage_data.get("screenshot", ""))
 
         rows.append(row)
 

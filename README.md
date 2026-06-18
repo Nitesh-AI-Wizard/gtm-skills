@@ -5,7 +5,7 @@ Claude Code skills for GTM (Go-To-Market) engineering and outbound sales automat
 ## Skills
 
 ### firecrawl-research
-Extract LLM-ready markdown from company websites using Firecrawl. Scrapes homepage, about, careers, blog, pricing, customers, integrations, and product pages. Supports batch processing, full-page screenshots, and Google Sheets output.
+Extract LLM-ready markdown from company websites using Firecrawl. Scrapes homepage, about, careers, blog, pricing, customers, integrations, and product pages. Supports batch processing, customer/partner extraction from content, and Google Sheets output.
 
 **Modes:**
 - **Standard** (5-8 credits) — Homepage + About + Careers + Blog + Pricing + Customers + Integrations + Product
@@ -16,7 +16,7 @@ Extract LLM-ready markdown from company websites using Firecrawl. Scrapes homepa
 **Features:**
 - Credit-efficient map-then-scrape approach (1 credit to discover URLs, 1 per page scraped)
 - Accurate credit tracking (reads actual credits from Firecrawl response, including stealth proxy costs)
-- Full-page homepage screenshots when supported (uses `full_page=True`, graceful fallback)
+- Post-scrape customer/partner extraction from markdown content (more reliable than screenshot-based logo detection)
 - Batch processing with resume capability
 - Google Sheets writer (gspread + OAuth2)
 - Multilingual URL matching (EN, TR, BG, RO, GR, DE)

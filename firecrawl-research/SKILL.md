@@ -141,29 +141,27 @@ The script:
 | Pricing | (content or empty) |
 | Integrations | (content or empty) |
 | Product | (content or empty) |
-| Screenshot | Full-page homepage screenshot URL (expires 24h) |
 
-## Step 4: Logo extraction from screenshots (bonus signal)
+## Step 4: Customer/partner extraction (post-scrape)
 
-The script attempts a full-page screenshot on every homepage scrape ($0 extra
-credit when it works). If the screenshot engine (chrome-cdp) fails, it retries
-with markdown-only — no content is lost.
+After scraping, Claude Code can extract customer and partner names from the
+scraped markdown content. This is more reliable than screenshot-based logo
+detection (tested: markdown found 13 companies on stripe.com, screenshots
+were too compressed to read logos reliably, and only worked on ~20-30% of sites).
 
-**How it works:**
-1. Homepage scrape includes `full_page=True` screenshot request
-2. If chrome-cdp engine succeeds → screenshot URL saved in JSON + Sheet
-3. If chrome-cdp fails → automatic fallback to markdown-only (costs 1 extra credit for the failed attempt)
-4. After scraping, Claude Code can read the screenshot to identify company logos in "Trusted by...", "Backed by...", "Our Partners" grids
+**How to run:**
 
-**Key detail:** Uses `full_page=True` so the entire page is captured (e.g. 1920x14727px),
-not just the top viewport (~900px). Logo grids are typically below the fold.
+1. Read the scan JSON for the domain
+2. Ask Claude Code to scan homepage + customers page content for:
+   - "Trusted by" / "Powered by" / "Used by" sections
+   - Case study links (e.g. `/customers/hertz`)
+   - Logo grid alt text or company name mentions
+   - "Backed by" / investor sections
+   - Partner program mentions
+3. Results are written to the Google Sheet in a "Customers/Partners Found" column
 
-**Availability:** Screenshots work on ~20-30% of sites. Most sites block the
-chrome-cdp browser engine needed for rendering. This is a bonus signal, not
-a guaranteed output. The fallback ensures content is always captured.
-
-**Note:** Screenshot URLs expire after 24 hours. Process them same-day or save
-the images locally.
+**For structured extraction of customers/partners/investors**, use Extract mode
+instead — it uses LLM-powered extraction which understands context far better.
 
 ## Local storage structure
 

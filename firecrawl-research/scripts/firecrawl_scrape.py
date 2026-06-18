@@ -49,7 +49,6 @@ except ImportError:
 
 try:
     from firecrawl import FirecrawlApp
-    from firecrawl.v2.types import ScreenshotFormat
 except ImportError:
     print("ERROR: firecrawl-py not installed. Run: pip install firecrawl-py")
     sys.exit(1)
@@ -303,52 +302,28 @@ def _scrape_one(app: FirecrawlApp, url: str, formats: list) -> object:
     return app.scrape(url, formats=formats, only_main_content=False, wait_for=1500)
 
 
-def _extract_content(response) -> tuple[str, str | None, int]:
-    """Pull markdown + screenshot + credits_used from a scrape response."""
+def _extract_content(response) -> tuple[str, int]:
+    """Pull markdown + credits_used from a scrape response."""
     content = ""
-    screenshot = None
     credits = 1  # default assumption
     if hasattr(response, "markdown"):
         content = response.markdown or ""
     elif isinstance(response, dict):
         content = response.get("markdown", "")
-    if hasattr(response, "screenshot"):
-        screenshot = response.screenshot
-    elif isinstance(response, dict):
-        screenshot = response.get("screenshot")
     # Read actual credits from metadata
     if hasattr(response, "metadata") and hasattr(response.metadata, "credits_used"):
         credits = response.metadata.credits_used or 1
-    return content, screenshot, credits
+    return content, credits
 
 
 def scrape_pages(app: FirecrawlApp, url_map: dict[str, str]) -> tuple[list[dict], int]:
-    """Scrape each confirmed URL. Full-page screenshot attempted on homepage.
-    Returns (results, total_scrape_credits)."""
+    """Scrape each confirmed URL. Returns (results, total_scrape_credits)."""
     results = []
     total_scrape_credits = 0
     for page_type, url in url_map.items():
         try:
-            content = ""
-            screenshot = None
-            page_credits = 0
-
-            if page_type == "homepage":
-                # Try with screenshot first (same credit if it works)
-                try:
-                    response = _scrape_one(app, url, [
-                        "markdown",
-                        ScreenshotFormat(type="screenshot", full_page=True),
-                    ])
-                    content, screenshot, page_credits = _extract_content(response)
-                except Exception:
-                    # Screenshot forced chrome-cdp which failed — retry markdown only
-                    print(f"    (screenshot engine failed, retrying markdown-only)")
-                    response = _scrape_one(app, url, ["markdown"])
-                    content, _, page_credits = _extract_content(response)
-            else:
-                response = _scrape_one(app, url, ["markdown"])
-                content, _, page_credits = _extract_content(response)
+            response = _scrape_one(app, url, ["markdown"])
+            content, page_credits = _extract_content(response)
 
             total_scrape_credits += page_credits
 
@@ -364,13 +339,10 @@ def scrape_pages(app: FirecrawlApp, url_map: dict[str, str]) -> tuple[list[dict]
                 "status": status,
                 "credits": page_credits,
             }
-            if screenshot:
-                page_result["screenshot"] = screenshot
 
             results.append(page_result)
-            screenshot_tag = " [screenshot]" if screenshot else ""
             credit_tag = f" [{page_credits}cr]" if page_credits > 1 else ""
-            print(f"  + {page_type}: {url} ({len(content)} chars) [{status}]{screenshot_tag}{credit_tag}")
+            print(f"  + {page_type}: {url} ({len(content)} chars) [{status}]{credit_tag}")
 
         except Exception as e:
             results.append({
@@ -483,8 +455,6 @@ def scrape_domain(domain: str, mode: str = "standard",
             "url": p["url"], "content": p["content"],
             "content_length": p["content_length"], "status": p["status"],
         }
-        if p.get("screenshot"):
-            page_entry["screenshot"] = p["screenshot"]
         pages_dict[p["type"]] = page_entry
 
     overall_status = "success"
