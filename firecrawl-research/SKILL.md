@@ -209,6 +209,15 @@ Mention this to the user when they ask about logo or partner detection.
 
 User can override with a custom schema.
 
+## Never do
+
+- **Never use Google Sheets MCP for writing large content** — it fails on big payloads. Use `sheets_writer.py` (gspread) instead.
+- **Never hardcode credit counts** — always read `response.metadata.credits_used` from the actual Firecrawl response. Stealth proxy charges 5 credits instead of 1.
+- **Never use "both" mode** (scrape + extract together) — too expensive, no real benefit over running them separately.
+- **Never scrape without mapping first** — blind scraping wastes credits on wrong URLs. Map (1 credit) then scrape matched pages only.
+- **Never run large batches without checking credit balance first** — monitor usage on the Firecrawl dashboard before and after runs. Stealth proxy can silently 5x your expected cost.
+- **Never assume 1 credit per page** — some sites trigger stealth proxy automatically. Always trust the tracked credits in tracker.json, not manual estimates.
+
 ## What this skill does NOT do
 
 | Not this skill | Whose job |
