@@ -1,0 +1,102 @@
+{
+  "skill_name": "prospeo-discover",
+  "evals": [
+    {
+      "id": 1,
+      "type": "Type 1 — Expert",
+      "prompt": "Find private B2B SaaS companies in the United States, 50-200 employees, Series A or Series B funding in the last year, in software development. Exclude consulting and nonprofits.",
+      "expected_output": "Directly maps to Prospeo filters and runs search. No clarifying questions.",
+      "expectations": [
+        "Calls mcp__prospeo__get_account_info first to detect plan",
+        "Reads prospeo-enums.json to check cache freshness",
+        "Maps 'US' to 'United States' via search_suggestions",
+        "Maps '50-200 employees' to ['51-100', '101-200']",
+        "Sets company_type.status = 'Private', business_model = 'b2b', subtypes.include = ['SaaS']",
+        "Sets company_funding.stage = ['Series A', 'Series B'], funding_date = 365",
+        "Sets company_industry.include = ['Software Development']",
+        "Sets company_industry.exclude to include consulting industry values",
+        "Adds a revenue default based on headcount (5M-50M)",
+        "Shows assembled filters for confirmation before searching",
+        "Calls mcp__prospeo__search_company with correct filter JSON",
+        "Presents total count, 25-row preview table, credit cost, and options"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "Type 2 — Partial",
+      "prompt": "Find tech companies in Germany",
+      "expected_output": "Identifies 'tech' as vague, shows matching industries/subtypes, asks clarifying questions for missing mandatory filters.",
+      "expectations": [
+        "Calls mcp__prospeo__get_account_info first",
+        "Identifies 'tech' is not a single Prospeo enum value",
+        "Shows matching industries (Software Development, IT Services, Technology Information and Internet, etc.)",
+        "Shows matching subtypes (SaaS, Platform, AI/ML, etc.)",
+        "Lets user pick which industries/subtypes match",
+        "Resolves 'Germany' via search_suggestions for exact location value",
+        "Asks about missing mandatory filters: company size, status, revenue",
+        "Offers smart defaults for each missing filter",
+        "Builds filters incrementally as user answers",
+        "Only runs search after all 5 mandatory filters are covered"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "Type 3 — Expert + Lookalike",
+      "prompt": "Find private AI companies in the US, 50-500 employees, Series A-C, similar to scale.ai",
+      "expected_output": "Parses full ICP, drops lookalike from final search with warning, runs search with ICP filters only.",
+      "expectations": [
+        "Calls GET /account-information first to detect plan",
+        "Checks plan supports lookalike (requires Starter+)",
+        "Maps all ICP filters correctly",
+        "Sets company_type.is_mainly_ai = true",
+        "Does NOT add company_lookalike to the final search filters",
+        "Warns user that lookalike is removed because it narrows results dramatically",
+        "Offers to add it back if user insists",
+        "Adds revenue default based on headcount range",
+        "Shows assembled ICP-only filters for confirmation",
+        "Runs search without lookalike filter",
+        "Presents results with count, preview, credit cost"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "Type 4 — Partial + Lookalike",
+      "prompt": "Find companies similar to torc.ai and field.ai, in the US and Germany, around 50-500 employees",
+      "expected_output": "Keeps location + headcount, runs lookalike for discovery only, analyzes patterns, recommends filters, drops lookalike from final search with warning.",
+      "expectations": [
+        "Calls GET /account-information first to detect plan",
+        "Keeps user's known filters: location (US, Germany) and headcount (50-500)",
+        "Runs lookalike search for discovery only (1-2 credits)",
+        "For multiple domains: gets company_oids first, then uses oid mode",
+        "Analyzes the 25 lookalike results for patterns",
+        "Extracts: top industries, funding stages, revenue ranges, keywords",
+        "Presents findings and recommends additional filters",
+        "Waits for user confirmation before adding discovered filters",
+        "Merges confirmed filters with user's original inputs",
+        "Drops lookalike from the final search filters",
+        "Warns user that lookalike is removed to avoid narrowing results",
+        "Runs full search with ICP filters only"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "Type 5 — Lookalike Only",
+      "prompt": "Find companies similar to torc.ai and field.ai",
+      "expected_output": "Runs lookalike for discovery, analyzes 25 results, builds full ICP from patterns, drops lookalike from final search with warning, runs ICP-only search.",
+      "expectations": [
+        "Calls GET /account-information first to detect plan",
+        "Gets Prospeo company IDs for both domains via company.websites.include search",
+        "Runs company_lookalike with company_oids mode, match_all = false (discovery only)",
+        "Analyzes all 25 results from page 1 (no export needed)",
+        "Extracts patterns for ALL 5 mandatory filters",
+        "Presents full ICP recommendation built from patterns",
+        "Waits for user to confirm or adjust",
+        "Builds complete filter JSON from confirmed patterns",
+        "Drops lookalike from the final search filters",
+        "Warns user that lookalike is removed to avoid narrowing results",
+        "Runs final search with ICP filters only",
+        "Total credit cost: 2-3 credits (seed lookup + lookalike + final search)"
+      ]
+    }
+  ]
+}
