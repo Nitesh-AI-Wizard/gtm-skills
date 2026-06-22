@@ -142,27 +142,6 @@ The script:
 | Integrations | (content or empty) |
 | Product | (content or empty) |
 
-## Step 4: Customer/partner extraction (post-scrape)
-
-After scraping, Claude Code can extract customer and partner names from the
-scraped markdown content. This is more reliable than screenshot-based logo
-detection (tested: markdown found 13 companies on stripe.com, screenshots
-were too compressed to read logos reliably, and only worked on ~20-30% of sites).
-
-**How to run:**
-
-1. Read the scan JSON for the domain
-2. Ask Claude Code to scan homepage + customers page content for:
-   - "Trusted by" / "Powered by" / "Used by" sections
-   - Case study links (e.g. `/customers/hertz`)
-   - Logo grid alt text or company name mentions
-   - "Backed by" / investor sections
-   - Partner program mentions
-3. Results are written to the Google Sheet in a "Customers/Partners Found" column
-
-**For structured extraction of customers/partners/investors**, use Extract mode
-instead — it uses LLM-powered extraction which understands context far better.
-
 ## Local storage structure
 
 All raw data persists on disk. If the user disconnects or Claude stops, the
