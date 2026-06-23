@@ -30,6 +30,122 @@ Content-Type: application/json
 - `POST /search-company` — company search (1 credit/page)
 - `POST /search-suggestions` — resolve locations, technologies, industries (free)
 
+### Exact Curl Formats (verified & tested)
+
+#### 1. GET /account-information (free)
+
+```bash
+curl -s -H "X-KEY: $KEY" "https://api.prospeo.io/account-information"
+```
+
+Response: `{"error": false, "response": {"current_plan": "PRO", "remaining_credits": 64523, ...}}`
+
+#### 2. POST /search-company (1 credit/page)
+
+```bash
+curl -s -X POST "https://api.prospeo.io/search-company" \
+  -H "X-KEY: $KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filters": {
+      "company_location_search": {"include": ["United States"]},
+      "company_headcount_range": ["11-20", "21-50"],
+      "company_industry": {"include": ["Software Development"]},
+      "company_type": {"status": "Private", "business_model": "b2b"}
+    },
+    "page": 1
+  }'
+```
+
+**Critical**: Filters go inside a `"filters": {}` wrapper. `"page"` is a sibling of `"filters"`, NOT inside it.
+
+Response: `{"results": [...], "pagination": {"current_page": 1, "total_page": 80, "total_count": 1991}}`
+
+#### 3. POST /search-suggestions (free, 15 req/sec rate limit)
+
+**Each search type uses its own body key.** Send exactly ONE key per request.
+
+| To resolve | Body key | Response key |
+|-----------|----------|-------------|
+| Locations | `"location_search"` | `location_suggestions` → `[{"name": "...", "type": "COUNTRY/STATE/CITY/ZONE"}]` |
+| Technologies | `"technology_search"` | `technology_suggestions` → `["HubSpot", "HubSpot Analytics", ...]` |
+| Industries | `"industry_search"` | `industry_suggestions` → `["Software Development", ...]` |
+| Job titles | `"job_title_search"` | `job_title_suggestions` → `["sales development representative", ...]` |
+| NAICS codes | `"naics_search"` | `naics_suggestions` → `[{"code": "5132", "label": "Software Publishers"}]` |
+| SIC codes | `"sic_search"` | `sic_suggestions` → `[{"code": "7371", "label": "..."}]` |
+| Integrations | `"company_integrations_search"` | `company_integrations_suggestions` → `["Salesforce", ...]` |
+| Awards | `"company_awards_search"` | `company_awards_suggestions` |
+| Compliance | `"company_awards_compliance_search"` | `company_awards_compliance_suggestions` |
+| Key customers | `"company_key_customers_search"` | `company_key_customers_suggestions` |
+| Investors | `"company_funding_investors_search"` | `company_funding_investors_suggestions` |
+| Accelerators | `"company_funding_accelerator_search"` | `company_funding_accelerator_suggestions` |
+| Operating languages | `"company_operating_languages_search"` | `company_operating_languages_suggestions` |
+| SEO keywords | `"company_google_discovery_search"` | `company_google_discovery_suggestions` |
+| Products | `"company_products_services_products_search"` | `company_products_services_products_suggestions` |
+| Services | `"company_products_services_services_search"` | `company_products_services_services_suggestions` |
+| ICP titles | `"company_icp_titles_search"` | `company_icp_titles_suggestions` |
+| ICP industries | `"company_icp_industries_search"` | `company_icp_industries_suggestions` |
+| ICP geo markets | `"company_icp_geographic_markets_search"` | `company_icp_geographic_markets_suggestions` |
+| ICP departments | `"company_icp_other_departments_search"` | `company_icp_other_departments_suggestions` |
+| Headcount by location | `"company_headcount_by_location_search"` | `company_headcount_by_location_suggestions` |
+| Traffic countries | `"company_website_traffic_countries_search"` | `company_website_traffic_countries_suggestions` |
+
+**Examples:**
+
+```bash
+# Location
+curl -s -X POST "https://api.prospeo.io/search-suggestions" \
+  -H "X-KEY: $KEY" -H "Content-Type: application/json" \
+  -d '{"location_search": "united states"}'
+
+# Technology
+curl -s -X POST "https://api.prospeo.io/search-suggestions" \
+  -H "X-KEY: $KEY" -H "Content-Type: application/json" \
+  -d '{"technology_search": "hubspot"}'
+
+# Industry
+curl -s -X POST "https://api.prospeo.io/search-suggestions" \
+  -H "X-KEY: $KEY" -H "Content-Type: application/json" \
+  -d '{"industry_search": "software"}'
+
+# Job title
+curl -s -X POST "https://api.prospeo.io/search-suggestions" \
+  -H "X-KEY: $KEY" -H "Content-Type: application/json" \
+  -d '{"job_title_search": "sales development"}'
+
+# NAICS (by code prefix or label text)
+curl -s -X POST "https://api.prospeo.io/search-suggestions" \
+  -H "X-KEY: $KEY" -H "Content-Type: application/json" \
+  -d '{"naics_search": "5132"}'
+
+# Company filter field (integrations, investors, etc.)
+curl -s -X POST "https://api.prospeo.io/search-suggestions" \
+  -H "X-KEY: $KEY" -H "Content-Type: application/json" \
+  -d '{"company_funding_investors_search": "sequoia"}'
+```
+
+**Common mistakes — do NOT use these formats:**
+- ~~`{"type": "location", "query": "..."}`~~ — wrong, this is the MCP abstraction
+- ~~`{"filter_id": "company_location_search", "query": "..."}`~~ — wrong, this is the local MCP server format
+- ~~`{"filter": "location", "query": "..."}`~~ — wrong field names
+- Must send exactly ONE search key per request, min 2 characters
+
+### API docs reference
+
+- Search suggestions: https://prospeo.io/api-docs/search-suggestions
+- Search company: https://prospeo.io/api-docs/search-company
+- Filters documentation: https://prospeo.io/api-docs/filters-documentation
+- Enum values: https://prospeo.io/api-docs/enum
+
+### Enum Values Reference
+
+All valid filter values are stored in `references/prospeo-enums.json` (refreshed every 21 days via `references/enum-refresh.md`).
+Do NOT guess or invent values — always check the enum cache or resolve via search-suggestions curl.
+
+- **Cached in `prospeo-enums.json`**: industries (256), subtypes (27), funding stages (23), employee ranges (11), revenue ranges (14), seniorities (10), business models (8), company statuses (4), email providers (5), news categories (10), exec events (24), ICP departments (15), ICP company sizes (5), headcount growth departments (19), headcount by department (14)
+- **Resolve at runtime via curl**: technologies (4,946) → `{"technology_search": "..."}`, locations → `{"location_search": "..."}`, plus all company filter fields (integrations, investors, awards, etc.)
+- **API docs for all enums**: https://prospeo.io/api-docs/enum
+
 **Critical rule — Lookalike filter:**
 - **NEVER include `company_lookalike` in the final search.** Stacking lookalike + ICP filters narrows results to single digits.
 - Lookalike is **discovery-only** — use it to analyze patterns and recommend ICP filters, then drop it before the final search.

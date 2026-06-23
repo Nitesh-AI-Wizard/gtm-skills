@@ -30,11 +30,25 @@ Write these directly — no API call needed:
 
 ### Fetched via API (may grow over time)
 
-Use `mcp__prospeo__search_suggestions` with `type: "industry"` to refresh industries.
+Use curl to refresh industries. Do NOT use MCP tools — use direct curl.
 
 **Procedure for industries** (target: 256 values):
 
-1. Run search_suggestions with these 2-char prefixes to maximize coverage:
+**Option A — Scrape from API docs (preferred, fastest):**
+Use WebFetch on `https://prospeo.io/api-docs/enum/industries` to get the full list in one call.
+
+**Option B — Crawl via search-suggestions curl (fallback):**
+
+1. Run search-suggestions with 2-char prefixes to maximize coverage:
+   ```bash
+   # Example for one prefix:
+   curl -s -X POST "https://api.prospeo.io/search-suggestions" \
+     -H "X-KEY: $KEY" -H "Content-Type: application/json" \
+     -d '{"industry_search": "ac"}'
+   # Response key: industry_suggestions → ["Accommodation Services", "Accounting", ...]
+   ```
+
+   Prefixes to cover all 256:
    ```
    ac, ad, ae, ag, ai, al, am, an, ap, ar, as, au, av
    bi, bl, bo, br, bu
@@ -58,7 +72,7 @@ Use `mcp__prospeo__search_suggestions` with `type: "industry"` to refresh indust
    wa, wh, wi, wo
    ```
 
-2. Collect all unique values from all responses
+2. Collect all unique values from all `industry_suggestions` responses
 3. Sort alphabetically
 4. Write to `industries` array in the JSON file
 
@@ -66,9 +80,16 @@ Use `mcp__prospeo__search_suggestions` with `type: "industry"` to refresh indust
 
 ### NOT cached (fetched at runtime)
 
-- **Technologies** (4,946 values) — use `search_suggestions` with `type: "technology"` when user mentions a specific tech
-- **Locations** — use `search_suggestions` with `type: "location"` when user mentions a place
-- **Job titles** — use `search_suggestions` with `type: "job_title"` when needed
+These are too large to cache. Resolve via curl when the user mentions specific values:
+
+- **Technologies** (4,946 values) → `curl -d '{"technology_search": "hubspot"}'` → `technology_suggestions`
+- **Locations** → `curl -d '{"location_search": "new york"}'` → `location_suggestions`
+- **Job titles** → `curl -d '{"job_title_search": "sales"}'` → `job_title_suggestions`
+- **Company filter fields** (integrations, investors, awards, etc.) → `curl -d '{"company_integrations_search": "salesforce"}'` → `company_integrations_suggestions`
+
+Full list of runtime search keys and response keys documented in SKILL.md → "Exact Curl Formats" section.
+
+**For technologies specifically**: The full list (4,946 values) is available at https://prospeo.io/api-docs/enum/technologies but is >10MB. Runtime search-suggestions is the practical approach — the user will always specify what tech they want (e.g., "companies using HubSpot"), so a targeted lookup is sufficient.
 
 ## After Refresh
 
