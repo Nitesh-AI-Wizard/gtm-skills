@@ -346,23 +346,52 @@ If `total_count` < 10: suggest loosening filters (broader headcount range, more 
 
 ## Step 4 — Export (on user request only)
 
-Only export when the user explicitly asks. Ask which format:
+Only export when the user explicitly asks. **Always use the Python export script** — never use MCP tools or manual API pagination for exports.
 
-### Option A — Display in conversation
+### Export Script
 
-Paginate through results, 25 per page, 1 credit each.
+**Script location**: `scripts/sheets_export.py`
+**Dependencies**: `pip install requests gspread google-auth`
 
-### Option B — Export to Google Sheets
+### Export Procedure
 
-**If the user provides a spreadsheet URL or ID**: use that spreadsheet. Add a new sheet tab to it.
+1. **Save the current filter JSON to a temp file**:
+   ```bash
+   cat > /tmp/prospeo_filters.json << 'EOF'
+   {filters JSON here}
+   EOF
+   ```
 
-**If no spreadsheet given**: create a new spreadsheet via `mcp__google-sheets__create_spreadsheet` named:
-`Prospeo Discovery — {short search summary} — {YYYY-MM-DD}`
-Example: `Prospeo Discovery — B2B SaaS US 50-200 Series A — 2026-06-22`
+2. **Run the export script**:
+   ```bash
+   # New spreadsheet (auto-created):
+   python3 scripts/sheets_export.py --filters /tmp/prospeo_filters.json
 
-**Sheet tabs to create**:
+   # Existing spreadsheet (user provided URL/ID):
+   python3 scripts/sheets_export.py --filters /tmp/prospeo_filters.json --spreadsheet-id SHEET_ID
 
-1. **Results** — one row per company with these columns mapped from the Prospeo response:
+   # Custom tab name:
+   python3 scripts/sheets_export.py --filters /tmp/prospeo_filters.json --tab-name "my-search"
+
+   # Cap pages (for very large result sets):
+   python3 scripts/sheets_export.py --filters /tmp/prospeo_filters.json --max-pages 20
+
+   # Dry run (preview count without spending credits):
+   python3 scripts/sheets_export.py --filters /tmp/prospeo_filters.json --dry-run
+   ```
+
+3. **Share the spreadsheet URL** with the user from the script output.
+
+### What the Script Does
+
+- Fetches all pages from Prospeo `/search-company` automatically
+- Creates two tabs: **Results** (15-column company data) + **Search Info** (filters & metadata)
+- Writes in batches of 50 rows with retry on error
+- Rate-limits both Prospeo API (0.5s) and Google Sheets API (1s between batches)
+- Built-in cost guard: confirms with user before fetching >10 pages
+- Handles 3,000-5,000+ company exports that MCP tools cannot
+
+### Results Tab Columns
 
 | Column | Prospeo Response Field |
 |--------|----------------------|
@@ -374,33 +403,22 @@ Example: `Prospeo Discovery — B2B SaaS US 50-200 Series A — 2026-06-22`
 | HQ City | `city` |
 | HQ State | `state` |
 | Country | `country` |
-| Revenue | `estimated_revenue` or `revenue_range` |
+| Revenue | `revenue_range_printed` |
 | Funding Stage | `last_funding_type` |
 | Total Funding | `total_funding` |
 | Latest Funding Date | `last_funding_date` |
 | LinkedIn URL | `linkedin_url` |
-| Keywords | `keywords` (join array with comma) |
-| Founded | `founded_year` |
+| Keywords | `keywords` (first 15, comma-joined) |
+| Founded | `founded` |
 
-2. **Search Info** — metadata tab with:
-   - Filters applied (human-readable summary)
-   - Total companies found
-   - Pages exported / credits used
-   - Export date and time
-   - Prospeo plan and credits remaining after export
+### Cost Guard
 
-**Export procedure**:
-1. Create/open the spreadsheet and add both tabs
-2. Write the `Search Info` tab first (1 row per metadata field)
-3. Write `Results` header row
-4. Loop through pages: call `POST /search-company` with incrementing `page`, write 25 rows per page
-5. After each page, report progress: `"Exported {count}/{total} companies ({credits} credits used)"`
-6. After final page, share the spreadsheet URL with the user
-
-**Cost guard**: Before starting export, confirm with the user:
+Before running export, tell the user:
 > Full export: {total_pages} pages = {total_pages} credits. Your balance: {CREDITS} credits. Proceed?
 
-Default to displaying first 25 (already done in Step 3) if user doesn't specify.
+If `total_count` > 2,000: recommend `--dry-run` first, then confirm.
+
+Default to displaying first 25 (already done in Step 3) if user doesn't specify export.
 
 ---
 
