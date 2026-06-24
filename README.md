@@ -4,6 +4,51 @@ Claude Code skills for GTM (Go-To-Market) engineering and outbound sales automat
 
 ## Skills
 
+### prospeo-discover
+B2B company discovery and list building using Prospeo's 30M+ company database with 33 search filters. Handles five user types — from full ICP experts to users who only have seed company domains.
+
+**User Types:**
+- **Type 1 — Expert**: Full ICP provided, maps directly to filters
+- **Type 2 — Partial**: Vague input, guides user through filter selection with smart defaults
+- **Type 3 — Expert + Lookalike**: Full ICP + seed domains
+- **Type 4 — Partial + Lookalike**: Partial filters + seed domains, discovers patterns from lookalike results
+- **Type 5 — Lookalike Only**: Only seed domains, builds full ICP from lookalike analysis
+
+**Features:**
+- Auto-detects Prospeo plan (Free/Starter/Growth/Pro) and only offers available filters
+- 5 mandatory filters with smart defaults (location, size, industry, status, revenue)
+- Lookalike as discovery-only — never stacked in final search (narrows results to single digits)
+- Smart, data-driven optional filter recommendations from 4 context sources
+- Python export script for large lists (3,000-5,000+ companies) with batch writing to Google Sheets
+- Enum cache for 256 industries, 27 subtypes, 23 funding stages, and more
+- Credit tracking and cost guards before every export
+
+**Export:**
+```bash
+# Dry run (no credits spent on export)
+python3 prospeo-discover/scripts/sheets_export.py --filters filters.json --dry-run
+
+# Export to new spreadsheet
+python3 prospeo-discover/scripts/sheets_export.py --filters filters.json
+
+# Export to existing spreadsheet with custom tab
+python3 prospeo-discover/scripts/sheets_export.py --filters filters.json --spreadsheet-id SHEET_ID --tab-name "my-search"
+
+# Limit pages
+python3 prospeo-discover/scripts/sheets_export.py --filters filters.json --max-pages 10
+```
+
+**Requirements:**
+```bash
+pip install requests gspread google-auth
+```
+
+**Auth:**
+- Prospeo: `PROSPEO_API_KEY` (set in script or env)
+- Google Sheets: OAuth2 token at `~/.google/token.json`
+
+---
+
 ### firecrawl-research
 Extract LLM-ready markdown from company websites using Firecrawl. Scrapes homepage, about, careers, blog, pricing, customers, integrations, and product pages. Supports batch processing, customer/partner extraction from content, and Google Sheets output.
 
