@@ -540,5 +540,5 @@
     "has_enterprise_plan",
     "has_public_pricing"
   ],
-  "_note": "Industries list contains ~210 of 256 known values. Technologies (4,946) and locations are NOT cached \u2014 use search_suggestions at runtime."
+  "_note": "Industries list contains all 256 known values (verified 2026-06-24). Technologies (4,946) and locations are NOT cached — use search_suggestions at runtime."
 }

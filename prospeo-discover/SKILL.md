@@ -576,14 +576,14 @@ Skill interprets the vague term against enum cache, shows matching industries/su
 ### Type 3 — Expert + Lookalike
 > User provides: full ICP filters + a seed domain
 
-Skill parses ICP into filters, stacks `company_lookalike` on top, runs combined search in one call.
+Skill parses ICP into filters, uses seed domain for reference only. Lookalike is NOT added to the final search — warns user that stacking narrows results to single digits. Runs search with ICP filters only.
 
 ### Type 4 — Partial + Lookalike
 > User provides: partial filters (e.g., location + headcount) + seed domain(s)
 
-Skill keeps known filters, runs lookalike (1 credit, 25 results), analyzes patterns, recommends missing filters, merges on confirmation, runs full search.
+Skill keeps known filters, runs lookalike for discovery only (1 credit, 25 results), analyzes patterns, recommends missing filters, merges on confirmation. Drops lookalike from final search, runs with ICP filters only.
 
 ### Type 5 — Lookalike Only
 > User provides: 2+ seed domains, no ICP filters
 
-Skill gets company IDs, runs lookalike (1-2 credits), analyzes 25 results for patterns across all mandatory filters, presents full ICP recommendation, builds filters on confirmation, runs full search.
+Skill gets company IDs, runs lookalike for discovery only (1-2 credits), analyzes 25 results for patterns across all mandatory filters, builds full ICP recommendation. Drops lookalike from final search, runs with ICP filters only.

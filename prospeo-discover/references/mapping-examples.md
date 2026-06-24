@@ -12,7 +12,7 @@
 | "Bay Area" / "SF" | `"company_location_search": {"include": ["San Francisco Bay Area"]}` — resolve via search_suggestions |
 | "DACH region" | `"company_location_search": {"include": ["Germany", "Austria", "Switzerland"]}` |
 
-> Always resolve location values via `mcp__prospeo__search_suggestions` with `type: "location"`.
+> Always resolve location values via `POST /search-suggestions` with `{"location_search": "..."}` — see SKILL.md for exact curl format.
 
 ## Company Size Mappings
 
@@ -121,12 +121,14 @@ User: "Find private B2B SaaS companies in the US, 50-200 employees, Series A or 
 }
 ```
 
-### Lookalike + Filters (Type 3)
+### Expert + Lookalike (Type 3) — Lookalike is discovery-only
 User: "Find AI companies similar to scale.ai, US, 50-500 employees, Series A-C"
 
+Lookalike is used for reference only — NOT included in the final search (stacking narrows results to single digits).
+
+**Final search filters** (no `company_lookalike`):
 ```json
 {
-  "company_lookalike": {"domain": "scale.ai", "minimum_tier": "T2"},
   "company_location_search": {"include": ["United States"]},
   "company_headcount_range": ["51-100", "101-200", "201-500"],
   "company_type": {"status": "Private", "is_mainly_ai": true},
