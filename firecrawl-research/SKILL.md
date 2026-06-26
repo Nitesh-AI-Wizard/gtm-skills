@@ -1,128 +1,68 @@
 ---
 name: firecrawl-research
 description: >
-  Extract LLM-ready markdown from a company website using Firecrawl.
-  Activate when the user wants to scrape a prospect's site, extract company
-  pages, fetch website content for research, read a company's homepage/about/
-  careers/blog/pricing, or prepare content for signal-builder scoring.
-  Also triggers on: "scrape this company", "read their website", "what's on
-  their site", "extract pages from", "get me the content from", "research
-  this domain", "fetch their careers page", or any URL + "scrape/extract/read".
-  Covers static pages, JS-heavy SPAs, structured extraction, batch scraping,
-  and anti-bot bypass. Uses Firecrawl /map + /scrape + /extract.
+  Scrapes a company website into clean, page-typed markdown using Firecrawl
+  map + scrape + extract. Triggers on: "scrape this company", "read their
+  website", "extract pages from", "research this domain", "fetch their
+  careers page", or any URL + "scrape/extract/read". Covers single domain,
+  batch processing, structured LLM extraction, and Google Sheets output.
 ---
 
-# Firecrawl Research - Layer 03 Extraction
+# Firecrawl Research
 
-Given a company domain, read its website and return clean, LLM-ready markdown
-organized by page type. Downstream skills (signal-builder, email-writer) consume
-this output as raw material.
+Given a company domain, scrape its website and return clean markdown organized
+by page type. Downstream skills (signal-builder, email-writer) consume this
+output. This skill fetches only — scoring and interpretation belong to
+signal-builder.
 
-This skill FETCHES. It does not judge, score, or interpret signals - that is
-signal-builder's job (Layer 05).
+## Quick start
 
-## How to invoke
+The user provides domain(s) and optionally a mode. Default to standard.
 
-The user provides:
-1. **Domain(s)** - one domain or a list (e.g. "acme.com" or a Sheet of domains)
-2. **Mode** (optional) - defaults to standard
+| Mode | Credits | Pages |
+|------|---------|-------|
+| standard | 5-8 | Homepage, About, Careers, Blog, Pricing, Customers, Integrations, Product |
+| deep | 5-11 | Standard + Changelog, Leadership |
+| minimal | 3 | Homepage, About only |
+| extract | ~20+ | Structured JSON via LLM extraction |
 
-## Step 0: Confirm mode and extraction method (ALWAYS ask first)
+If the user doesn't specify a mode, use standard. Confirm mode before running
+only when the choice is ambiguous or the batch is large (>50 domains).
 
-Ask the user before running anything:
-
-> **Mode:**
-> - **Standard** (5-8 credits) - Homepage + About + Careers + Blog + Pricing + Customers + Integrations + Product
-> - **Deep** (5-11 credits) - Standard + Changelog + Leadership
-> - **Minimal** (3 credits) - Homepage + About only
-> - **Extract** (~20+ credits) - Structured JSON fields via LLM extraction (founder, headcount, tech stack, customers, partners, investors, etc.)
->
-> Single domain or batch?
-
-If batch, also ask:
-> Share a Google Sheet URL for results, or should I create one?
-
-Wait for the answer before proceeding.
-
-## Step 1: Run the scraper
-
-All data is stored locally on disk first. The script creates a run folder with
-a tracker file so runs can be resumed if interrupted.
-
-**Single domain:**
-```bash
-python3 .claude/skills/firecrawl-research/scripts/firecrawl_scrape.py \
-  --domain "acme.com" \
-  --mode standard
-```
-
-**Batch from domains file:**
-```bash
-python3 .claude/skills/firecrawl-research/scripts/firecrawl_scrape.py \
-  --batch domains.txt \
-  --mode standard
-```
-
-To create a domains file from a Google Sheet, read the sheet via MCP, then
-write one domain per line to a text file.
-
-**Resume interrupted batch:**
-```bash
-python3 .claude/skills/firecrawl-research/scripts/firecrawl_scrape.py \
-  --resume .claude/skills/firecrawl-research/runs/<run-folder-name>
-```
-
-The script automatically:
-- Creates a timestamped run folder under `.claude/skills/firecrawl-research/runs/`
-- Saves each domain's full JSON to `runs/<name>/scans/<domain>.json`
-- Maintains `runs/<name>/tracker.json` with progress and credits used
-- Pauses 2 seconds between domains in batch mode
-
-## Step 2: Check progress
-
-After the scrape completes (or if resuming), read the tracker:
+## Running the scraper
 
 ```bash
-cat .claude/skills/firecrawl-research/runs/<run-folder>/tracker.json
+# Single domain
+python3 scripts/firecrawl_scrape.py --domain "acme.com" --mode standard
+
+# Batch (one domain per line in file)
+python3 scripts/firecrawl_scrape.py --batch domains.txt --mode standard
+
+# Resume interrupted batch
+python3 scripts/firecrawl_scrape.py --resume runs/<run-folder-name>
 ```
 
-The tracker shows:
-- Total/completed/failed/pending domains
-- Credits used per domain and total
-- Which domains still need processing
+All paths are relative to the skill folder (`firecrawl-research/`).
 
-Show the user a summary:
+The script creates a timestamped run folder under `runs/` with a `tracker.json`
+for progress and per-domain JSON scan files under `runs/<name>/scans/`.
 
-```
-## Extraction Run: 2026-06-18_143000_standard_5domains
-- Completed: 5/5 | Failed: 0
-- Total credits: 24
-- Run folder: .claude/skills/firecrawl-research/runs/2026-06-18_143000_standard_5domains/
-```
+After a scrape completes, read the tracker and show the user a summary
+(completed/failed count, total credits).
 
-## Step 3: Write results to Google Sheet
+## Writing to Google Sheet
 
-Use the Python sheet writer script (NOT the Google Sheets MCP - it fails on
-large content). The script uses gspread with the same OAuth2 auth.
+Use `scripts/sheets_writer.py` — the Google Sheets MCP fails on large content.
 
 ```bash
-python3 .claude/skills/firecrawl-research/scripts/sheets_writer.py \
-  --run-dir .claude/skills/firecrawl-research/runs/<run-folder> \
+python3 scripts/sheets_writer.py \
+  --run-dir runs/<run-folder> \
   --spreadsheet-id <SHEET_ID>
 ```
 
-**Options:**
-- `--summary` - write summary with char counts instead of full content (default: full content)
-- `--tab-name "custom-name"` - custom tab name (default: auto-generated)
+Options: `--summary` (char counts instead of full content), `--tab-name "name"`.
 
-The script:
-- Reads all JSON scan files from the run folder
-- Cleans markdown (strips images, simplifies links)
-- Writes header + data rows in batches of 20
-- Creates a new sheet tab automatically
-- Handles large content without failing
-
-### Sheet columns (auto-generated by the writer):
+### Output columns
 
 | Column | Content |
 |--------|---------|
@@ -133,35 +73,39 @@ The script:
 | URLs Found | 47 |
 | Pages Scraped | 6 |
 | Credits Used | 7 |
-| Homepage | [6073 chars] summary... |
-| About | [7199 chars] summary... |
-| Careers | [4357 chars] summary... |
-| Blog | [10059 chars] summary... |
-| Customers | (content or empty) |
-| Pricing | (content or empty) |
-| Integrations | (content or empty) |
-| Product | (content or empty) |
+| Homepage…Product | Page content (or empty if not found) |
 
-## Local storage structure
+## Page types
 
-All raw data persists on disk. If the user disconnects or Claude stops, the
-data is safe and can be resumed.
+See `references/page-types.md` for full classification and multilingual patterns.
 
+| Tier | Pages | Modes |
+|------|-------|-------|
+| 1 | Homepage, About, Careers, Blog | All |
+| 2 | Customers, Pricing, Integrations, Product | Standard + Deep |
+| 3 | Changelog, Leadership | Deep only |
+
+Careers scrapes the main `/careers` page only (1 credit).
+
+## Extract mode
+
+When the user picks extract without a custom schema, the script uses:
+
+```json
+{
+  "founder": "string", "headcount_clues": "string",
+  "tech_mentions": "array", "funding_clues": "string",
+  "product_category": "string", "customers_mentioned": "array",
+  "partners": "array", "investors": "array",
+  "year_founded": "string", "locations": "array"
+}
 ```
-.claude/skills/firecrawl-research/runs/
-  2026-06-18_143000_standard_5domains/
-    tracker.json              # progress tracker (resumable)
-    scans/
-      acme.com.json           # full research packet per domain
-      stripe.com.json
-      notion.so.json
-      ...
-```
 
-Each domain JSON contains full markdown content, metadata, and credit usage.
-The sheet writer reads from these files.
+Extract mode is the best way to get customer/partner/investor data — it uses
+LLM-powered extraction that understands context better than HTML parsing.
+The user can override with a custom schema.
 
-## Cost guards
+## Cost and credit rules
 
 | Trigger | Action |
 |---------|--------|
@@ -170,62 +114,21 @@ The sheet writer reads from these files.
 | Batch > 500 domains | Suggest minimal mode, require confirmation |
 | Estimated batch > $10 | Hard stop, require user approval |
 
-Estimate cost: credits x $0.001 (Standard plan) or credits x $0.0004 (Growth).
+Credit math: credits x $0.001 (Standard plan) or credits x $0.0004 (Growth).
 
-## Page types reference
+Credit tracking rules — these prevent silent cost overruns:
+- Read actual credits from `response.metadata.credits_used`, not hardcoded counts. Firecrawl's stealth proxy charges 5 credits instead of 1 and activates automatically on blocked sites.
+- Always map before scraping — blind scraping wastes credits on wrong URLs.
+- Check the Firecrawl dashboard credit balance before large batches. Stealth proxy can silently 5x expected cost.
+- Running scrape + extract together on the same domain has no benefit over running them separately and costs more.
 
-See `references/page-types.md` for full classification.
+## Scope boundaries
 
-| Tier | Pages | Modes |
-|------|-------|-------|
-| 1 | Homepage, About, Careers, Blog | All modes |
-| 2 | Customers, Pricing, Integrations, Product | Standard + Deep |
-| 3 | Changelog, Leadership | Deep only |
-
-Careers: main `/careers` page only (1 credit). TheirStack handles deep JDs.
-
-## Extract mode default schema
-
-When the user picks extract mode without a custom schema:
-
-```json
-{
-  "founder": "string - founder/CEO name(s)",
-  "headcount_clues": "string - team size indicators",
-  "tech_mentions": "array - technologies, tools, platforms mentioned",
-  "funding_clues": "string - funding, investment, or revenue mentions",
-  "product_category": "string - what the company builds/sells",
-  "customers_mentioned": "array - customer/client names (logo grids, case studies)",
-  "partners": "array - partner company names on the site",
-  "investors": "array - investor/funding partner names (backed by sections)",
-  "year_founded": "string - founding year if mentioned",
-  "locations": "array - office locations/HQ"
-}
-```
-
-Extract mode is the best way to get customer/partner/investor logos -- it uses
-LLM-powered extraction which understands context far better than HTML parsing.
-Mention this to the user when they ask about logo or partner detection.
-
-User can override with a custom schema.
-
-## Never do
-
-- **Never use Google Sheets MCP for writing large content** — it fails on big payloads. Use `sheets_writer.py` (gspread) instead.
-- **Never hardcode credit counts** — always read `response.metadata.credits_used` from the actual Firecrawl response. Stealth proxy charges 5 credits instead of 1.
-- **Never use "both" mode** (scrape + extract together) — too expensive, no real benefit over running them separately.
-- **Never scrape without mapping first** — blind scraping wastes credits on wrong URLs. Map (1 credit) then scrape matched pages only.
-- **Never run large batches without checking credit balance first** — monitor usage on the Firecrawl dashboard before and after runs. Stealth proxy can silently 5x your expected cost.
-- **Never assume 1 credit per page** — some sites trigger stealth proxy automatically. Always trust the tracked credits in tracker.json, not manual estimates.
-
-## What this skill does NOT do
-
-| Not this skill | Whose job |
-|----------------|-----------|
-| Score or rank signals | signal-builder (Layer 05) |
-| Identify hiring intent | signal-builder (Layer 05) |
-| Find email addresses | prospeo-resolve (Layer 06) |
-| Discover domains | prospeo-discover / apify-maps (Layer 01/02) |
+| Not this skill | Use instead |
+|----------------|-------------|
+| Score or rank signals | signal-builder |
+| Find email addresses | prospeo-resolve |
+| Discover domains | prospeo-discover |
 
 ## Troubleshooting
 
@@ -236,7 +139,7 @@ User can override with a custom schema.
 | All pages thin_content | Site is JS-heavy or blocked |
 | Credits running low | Switch to minimal mode |
 | Sheet writer auth fails | Re-auth: `rm ~/.google/token.json` then re-run |
-| Interrupted batch | Resume: `--resume <run-folder-path>` |
+| Interrupted batch | Resume with `--resume <run-folder-path>` |
 | Script import error | `pip install firecrawl-py python-dotenv gspread google-auth` |
 
 ## Auth
