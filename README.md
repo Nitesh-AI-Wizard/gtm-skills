@@ -88,6 +88,39 @@ pip install firecrawl-py python-dotenv gspread google-auth
 - Firecrawl: `FIRECRAWL_API_KEY` in `.env`
 - Google Sheets: OAuth2 token at `~/.google/token.json`
 
+### 04-crustdata-signals
+Enrich a list of company domains with structured signals from CrustData — funding rounds, headcount growth, department growth, and recent hires (people who joined in last N days). Writes results across 5 Google Sheets tabs.
+
+**Features:**
+- Enriches domains via CrustData's company enrichment + person search APIs
+- 5 output tabs: Signal Summary, Funding Rounds, Headcount Growth, Department Growth, Recent Hires
+- Configurable hire window (90, 180, or 365 days)
+- Accepts domains from Google Sheet or raw list
+- Google Sheets writer with OAuth2 auth
+
+**Usage:**
+```bash
+# Set API key
+export CRUSTDATA_API_KEY=<your-key>
+
+# Run enrichment
+python3 04-crustdata-signals/scripts/crustdata_signals.py --domains domains.txt --hire-window 180
+
+# Write to Google Sheet
+python3 04-crustdata-signals/scripts/sheets_writer.py --run-dir <run-folder> --spreadsheet-id <SHEET_ID>
+```
+
+**Requirements:**
+```bash
+pip install requests gspread google-auth
+```
+
+**Auth:**
+- CrustData: `CRUSTDATA_API_KEY` env var
+- Google Sheets: OAuth2 token at `~/.google/token.json`
+
+---
+
 ## About
 
 Built by [Nitesh Dhande](https://github.com/Nitesh-AI-Wizard) at [Zevenue](https://zevenue.com) — a GTM Engineering Partner for B2B startups.

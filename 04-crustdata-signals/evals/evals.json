@@ -1,0 +1,47 @@
+{
+  "skill_name": "crustdata-signals",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Run crustdata signals on serverobotics.com with 180 day hiring window",
+      "expected_output": "Signal summary with funding, growth, and hiring data for Serve Robotics",
+      "files": [],
+      "expectations": [
+        "Script runs crustdata_signals.py with --domains serverobotics.com --hire-days 180",
+        "JSON saved to outputs/ folder with enrich + recent_hires data",
+        "Funding signal mentions post-IPO equity or Series funding",
+        "Growth signal shows YoY headcount increase",
+        "Recent hires tab populated with people who joined in last 180 days",
+        "Offers to write results to Google Sheet or create new one"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Enrich these 3 domains with crustdata: prenosis.com, thirdway.health, paradigmhealth.ai. Use 90 day hire window. Write results to a new sheet.",
+      "expected_output": "Batch enrichment of 3 domains with 5 tabs written to a new Google Sheet",
+      "files": [],
+      "expectations": [
+        "Script processes all 3 domains sequentially with rate limiting",
+        "Each domain gets its own JSON backup file",
+        "Tracker shows 3 done, 0 failed",
+        "sheets_writer.py creates new sheet with --create-new flag",
+        "Signal Summary tab has 3 rows (one per domain)",
+        "Funding tab has variable rows (one per round per company)",
+        "Asks user about deleting JSON files after sheet write"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Pull crustdata signals from this sheet https://docs.google.com/spreadsheets/d/ABC123/edit, tab 'Prospects', domain column B, 365 day hiring window. Write back to the same sheet.",
+      "expected_output": "Reads domains from sheet, enriches all, writes 5 new tabs back to same sheet",
+      "files": [],
+      "expectations": [
+        "Extracts spreadsheet ID ABC123 from URL",
+        "Script runs with --sheet-id ABC123 --tab Prospects --domain-col B --hire-days 365",
+        "sheets_writer.py writes to same spreadsheet with --spreadsheet-id ABC123",
+        "5 tabs created: Signal Summary, Recent Hires, Funding, Company Growth, Dept Growth",
+        "Run summary saved as .md file in runs/ folder"
+      ]
+    }
+  ]
+}
