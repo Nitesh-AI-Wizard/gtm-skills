@@ -67,6 +67,8 @@ The script:
 - Maintains a `tracker.json` for resume capability
 - If it fails mid-run, resume with: `--resume --output-dir outputs/{run-id}`
 
+> **Note:** The `outputs/` and `runs/` directories do not exist by default. The script creates them automatically on first run.
+
 ### Step 3: Write to Google Sheets
 
 ```bash
