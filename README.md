@@ -4,6 +4,39 @@ Claude Code skills for GTM (Go-To-Market) engineering and outbound sales automat
 
 ## Skills
 
+### 01-aiark-discover
+B2B company discovery and list building via AI Ark's 72M+ company database with 921 industries, geo-location search, growth metrics, and lookalike discovery.
+
+**Features:**
+- 921 industries, 16,041 technologies, 262 countries, 8 company types, 19 funding types
+- Geo-location radius search (lat/lng + km)
+- AdvanceFilter with SMART mode for fuzzy matching
+- Enum cache with auto-refresh (30 days)
+- Python export script for batch writing to Google Sheets
+
+**Usage:**
+```bash
+# Set API key
+export AIARK_API_KEY=<your-token>
+
+# Export to new spreadsheet
+python3 01-aiark-discover/scripts/sheets_export.py --filters filters.json
+
+# Dry run
+python3 01-aiark-discover/scripts/sheets_export.py --filters filters.json --dry-run
+```
+
+**Requirements:**
+```bash
+pip install requests gspread google-auth
+```
+
+**Auth:**
+- AI Ark: `AIARK_API_KEY` env var
+- Google Sheets: OAuth2 token at `~/.google/token.json`
+
+---
+
 ### prospeo-discover
 B2B company discovery and list building using Prospeo's 30M+ company database with 33 search filters. Handles five user types — from full ICP experts to users who only have seed company domains.
 
