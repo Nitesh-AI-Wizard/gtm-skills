@@ -55,14 +55,12 @@ Find people who joined a specific company in the last N days.
   },
   "fields": [
     "basic_profile.name",
-    "basic_profile.first_name",
-    "basic_profile.last_name",
     "basic_profile.headline",
     "basic_profile.location",
     "experience.employment_details.current.title",
     "experience.employment_details.current.start_date",
     "experience.employment_details.current.seniority_level",
-    "experience.employment_details.current.company_name",
+    "experience.employment_details.current.name",
     "experience.employment_details.current.function_category"
   ],
   "sorts": [

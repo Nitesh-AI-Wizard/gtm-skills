@@ -60,16 +60,13 @@ PERSON_SEARCH_DELAY = 60.0 / PERSON_SEARCH_RPM + 0.5  # ~2.5s
 # Person search fields to return
 PERSON_FIELDS = [
     "basic_profile.name",
-    "basic_profile.first_name",
-    "basic_profile.last_name",
     "basic_profile.headline",
     "basic_profile.location",
     "experience.employment_details.current.title",
     "experience.employment_details.current.start_date",
     "experience.employment_details.current.seniority_level",
-    "experience.employment_details.current.company_name",
+    "experience.employment_details.current.name",
     "experience.employment_details.current.function_category",
-    "experience.employment_details.current.employment_type",
 ]
 
 SKILL_DIR = Path(__file__).resolve().parent.parent

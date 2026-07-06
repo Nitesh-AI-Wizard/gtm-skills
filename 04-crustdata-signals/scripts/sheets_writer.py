@@ -16,6 +16,7 @@ Usage:
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -28,7 +29,7 @@ except ImportError:
     print("ERROR: Missing dependencies. Run: pip install gspread google-auth")
     sys.exit(1)
 
-TOKEN_PATH = "/Users/niteshrameshdhande/.google/token.json"
+TOKEN_PATH = os.path.expanduser("~/.google/token.json")
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
 BATCH_SIZE = 20  # rows per API call
@@ -200,13 +201,17 @@ def analyze_dept_signal(headcount: dict) -> str:
     if not by_role:
         return ""
 
+    # Key departments to highlight (case-insensitive match against actual keys)
+    target_depts = ["engineering", "sales", "marketing", "product management", "operations"]
     parts = []
-    for dept in ["engineering", "sales", "marketing", "product"]:
-        count = by_role.get(dept, 0)
-        pct = by_role_pct.get(dept, 0)
-        if count and pct:
-            if isinstance(pct, (int, float)) and pct > 20:
-                parts.append(f"{dept.title()} +{pct}%")
+    for target in target_depts:
+        for key in by_role:
+            if key.lower() == target or key.lower().replace(" ", "_") == target:
+                count = by_role[key]
+                pct = by_role_pct.get(key, 0)
+                if count and pct and isinstance(pct, (int, float)) and pct > 10:
+                    parts.append(f"{key} {pct:.0f}%")
+                break
     return " | ".join(parts) if parts else ""
 
 
@@ -286,7 +291,11 @@ def build_signal_summary(results: list[dict]) -> tuple[list, list]:
         signals = [s for s in [funding_sig, growth_sig, dept_sig, hiring_sig] if s]
         summary = " || ".join(signals) if signals else "No signals detected"
 
-        industries = bi.get("industries", [])
+        # basic_info.industries is often null — fall back to taxonomy fields
+        industries = bi.get("industries") or []
+        if not industries:
+            tax = cd.get("taxonomy", {})
+            industries = tax.get("categories") or tax.get("professional_network_industries") or []
         industries_str = ", ".join(industries) if isinstance(industries, list) else str(industries or "")
 
         rows.append([
@@ -425,6 +434,15 @@ def build_company_growth(results: list[dict]) -> tuple[list, list]:
     return header, rows
 
 
+def _find_key_ci(d: dict, target: str):
+    """Case-insensitive + underscore-tolerant dict key lookup."""
+    norm = target.lower().replace("_", " ")
+    for k in d:
+        if k.lower().replace("_", " ") == norm:
+            return k
+    return None
+
+
 def build_department_growth(results: list[dict]) -> tuple[list, list]:
     header = ["Domain", "Company", "Department", "Current Headcount",
               "6m Ago", "YoY Ago", "6m Growth %", "YoY Growth %"]
@@ -437,40 +455,48 @@ def build_department_growth(results: list[dict]) -> tuple[list, list]:
         company = safe_get(cd, "basic_info", "name", default=domain)
         hc = cd.get("headcount", {})
         by_role = hc.get("by_role_absolute", {})
-        by_role_pct = hc.get("by_role_percent", {})
 
         # Also check by_function_timeseries for richer data
         func_ts = hc.get("by_function_timeseries", {})
         current_func = func_ts.get("CURRENT_FUNCTION", {}) if isinstance(func_ts, dict) else {}
 
-        for dept in DEPARTMENTS:
-            current_count = by_role.get(dept, 0)
+        # Iterate over all departments actually present in the data
+        all_depts = set()
+        for k in by_role:
+            all_depts.add(k)
+        for k in current_func:
+            all_depts.add(k)
+
+        for dept_name in sorted(all_depts):
+            current_count = by_role.get(dept_name, 0)
             if not current_count:
-                # Try from timeseries
-                dept_ts = current_func.get(dept, []) if isinstance(current_func, dict) else []
+                dept_ts = current_func.get(dept_name, [])
                 if dept_ts and isinstance(dept_ts, list) and len(dept_ts) > 0:
                     current_count = dept_ts[-1].get("headcount", 0) if isinstance(dept_ts[-1], dict) else 0
             if not current_count:
                 continue
 
-            # Growth from by_role_percent or compute from timeseries
-            dept_ts = current_func.get(dept, []) if isinstance(current_func, dict) else []
+            # Growth from timeseries
+            dept_ts = current_func.get(dept_name, [])
             hc_6m_ago = ""
             hc_12m_ago = ""
             growth_6m_pct = ""
             growth_12m_pct = ""
 
+            # Timeseries is monthly — index -7 = 6mo ago, -13 = 12mo ago
             if isinstance(dept_ts, list) and len(dept_ts) >= 7:
-                hc_6m_ago = dept_ts[-7].get("headcount", "") if isinstance(dept_ts[-7], dict) else ""
+                entry = dept_ts[-7]
+                hc_6m_ago = entry.get("employee_count", entry.get("headcount", "")) if isinstance(entry, dict) else ""
                 if hc_6m_ago and hc_6m_ago > 0:
                     growth_6m_pct = round(((current_count - hc_6m_ago) / hc_6m_ago) * 100, 1)
             if isinstance(dept_ts, list) and len(dept_ts) >= 13:
-                hc_12m_ago = dept_ts[-13].get("headcount", "") if isinstance(dept_ts[-13], dict) else ""
+                entry = dept_ts[-13]
+                hc_12m_ago = entry.get("employee_count", entry.get("headcount", "")) if isinstance(entry, dict) else ""
                 if hc_12m_ago and hc_12m_ago > 0:
                     growth_12m_pct = round(((current_count - hc_12m_ago) / hc_12m_ago) * 100, 1)
 
             rows.append([
-                domain, company, dept.replace("_", " ").title(),
+                domain, company, dept_name,
                 current_count, hc_6m_ago, hc_12m_ago, growth_6m_pct, growth_12m_pct,
             ])
 
@@ -493,7 +519,9 @@ def write_tab(sh: gspread.Spreadsheet, tab_name: str, header: list, rows: list):
     except gspread.exceptions.APIError:
         worksheet = sh.worksheet(tab_name)
         worksheet.clear()
-        print(f"  [{tab_name}] Using existing tab (cleared)")
+        # Resize to fit new data
+        worksheet.resize(rows=len(rows) + 1, cols=max(len(header), worksheet.col_count))
+        print(f"  [{tab_name}] Using existing tab (cleared + resized)")
 
     # Write header
     worksheet.update(range_name="A1", values=[header])
@@ -534,30 +562,40 @@ def write_tab(sh: gspread.Spreadsheet, tab_name: str, header: list, rows: list):
 
 def main():
     parser = argparse.ArgumentParser(description="Write CrustData signals to Google Sheets")
-    parser.add_argument("--run-dir", required=True, help="Path to run folder with JSON files")
+    parser.add_argument("--run-dir", nargs="+", required=True,
+                        help="One or more run folders with JSON files (combines all)")
     parser.add_argument("--spreadsheet-id", help="Write to existing Google Sheet")
     parser.add_argument("--create-new", action="store_true", help="Create a new Google Sheet")
     parser.add_argument("--title", default="CrustData Signals", help="Title for new sheet")
     args = parser.parse_args()
 
-    run_dir = Path(args.run_dir)
-    if not run_dir.exists():
-        print(f"ERROR: Run folder not found: {run_dir}")
+    # Load and dedupe from all run dirs
+    results = []
+    seen_domains = set()
+    for rd in args.run_dir:
+        run_dir = Path(rd)
+        if not run_dir.exists():
+            print(f"WARNING: Run folder not found, skipping: {run_dir}")
+            continue
+        for r in load_domain_jsons(run_dir):
+            domain = r.get("domain", "")
+            if domain not in seen_domains:
+                results.append(r)
+                seen_domains.add(domain)
+            else:
+                print(f"  Skipping duplicate: {domain}")
+
+    if not results:
+        print("ERROR: No JSON files found in any run folder")
         sys.exit(1)
 
     if not args.spreadsheet_id and not args.create_new:
         print("ERROR: Provide --spreadsheet-id or --create-new")
         sys.exit(1)
 
-    # Load data
-    results = load_domain_jsons(run_dir)
-    if not results:
-        print("ERROR: No JSON files found in run folder")
-        sys.exit(1)
-
     print(f"\nSheets Writer")
-    print(f"  Run folder: {run_dir}")
-    print(f"  Domains: {len(results)}")
+    print(f"  Run folders: {len(args.run_dir)}")
+    print(f"  Domains: {len(results)} (deduped)")
 
     # Connect to Google Sheets
     gc = get_gspread_client()
@@ -566,7 +604,9 @@ def main():
         sh = gc.create(args.title)
         spreadsheet_id = sh.id
         # Share with self for access
-        sh.share("niteshdhande11@gmail.com", perm_type="user", role="writer")
+        share_email = os.environ.get("SHEETS_SHARE_EMAIL")
+        if share_email:
+            sh.share(share_email, perm_type="user", role="writer")
         print(f"  Created new sheet: {args.title}")
         print(f"  ID: {spreadsheet_id}")
     else:
