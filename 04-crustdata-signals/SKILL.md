@@ -27,7 +27,7 @@ and column contain the domains.
 
 ## Prerequisites
 
-- `CRUSTDATA_API_KEY` env var — read `tech-stack/crustdata.md` for available keys
+- `CRUSTDATA_API_KEY` env var — get your API key from the [CrustData dashboard](https://crustdata.com)
 - Python packages: `requests`, `gspread`, `google-auth`
 - Google Sheets OAuth2 token at `~/.google/token.json`
 
@@ -57,7 +57,7 @@ Ask the user for domain source, hire window, and output destination. Default to
 ### 2. Run enrichment
 
 ```bash
-export CRUSTDATA_API_KEY=<key-from-tech-stack/crustdata.md>
+export CRUSTDATA_API_KEY=<your-crustdata-api-key>
 
 # From a list of domains
 python3 .claude/skills/crustdata-signals/scripts/crustdata_signals.py \
@@ -142,4 +142,4 @@ The sheets writer auto-generates signal text:
 
 - `references/enrich-api.md` — company enrich endpoint docs
 - `references/person-search-api.md` — person search endpoint docs
-- `tech-stack/crustdata.md` — API keys, auth headers, industry taxonomy
+- [CrustData API docs](https://crustdata.com/docs) — API keys, auth headers, industry taxonomy
