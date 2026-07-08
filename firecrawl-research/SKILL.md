@@ -122,6 +122,19 @@ Credit tracking rules — these prevent silent cost overruns:
 - Check the Firecrawl dashboard credit balance before large batches. Stealth proxy can silently 5x expected cost.
 - Running scrape + extract together on the same domain has no benefit over running them separately and costs more.
 
+## Shared output (records.jsonl)
+
+After each run (single or batch), the script writes a `records.jsonl` file to the
+run folder. Each line is one domain in the shared record format consumed by
+downstream skills (signal-builder, resolution):
+
+```jsonl
+{"company": "acme.com", "domain": "acme.com", "person": null, "filters_matched": ["has_homepage", "has_about", "has_careers", "has_pricing"]}
+```
+
+The `filters_matched` field lists page types found on the site. This file is
+additive - existing scan JSONs, tracker, and Sheet outputs are unchanged.
+
 ## Scope boundaries
 
 | Not this skill | Use instead |

@@ -2,21 +2,20 @@
 """
 sheets_export.py — Export Prospeo company search results to Google Sheets
 
-Fetches all pages from Prospeo /search-company API and writes them to a
-Google Sheet with two tabs: Results (company data) and Search Info (metadata).
+Fetches all pages from Prospeo /search-company and writes them to a Google Sheet
+with two tabs: Results (company data) and Search Info (metadata).
+
+Auth (environment variables, nothing hardcoded):
+  PROSPEO_API_KEY         required
+  GOOGLE_TOKEN_PATH       optional, default ~/.google/token.json
+  GOOGLE_CREDENTIALS_PATH optional, default ~/.google/credentials.json
 
 Usage:
-  # New spreadsheet (auto-created):
   python3 sheets_export.py --filters filters.json
-
-  # Existing spreadsheet:
   python3 sheets_export.py --filters filters.json --spreadsheet-id SHEET_ID
-
-  # With custom tab name:
   python3 sheets_export.py --filters filters.json --spreadsheet-id SHEET_ID --tab-name "my-search"
-
-  # Max pages limit:
   python3 sheets_export.py --filters filters.json --max-pages 10
+  python3 sheets_export.py --filters filters.json --dry-run
 
 filters.json example:
   {
@@ -30,6 +29,7 @@ filters.json example:
 
 import argparse
 import json
+import os
 import sys
 import time
 from datetime import datetime
@@ -49,10 +49,10 @@ except ImportError:
     print("ERROR: Missing dependencies. Run: pip install gspread google-auth")
     sys.exit(1)
 
-PROSPEO_API_KEY = "YOUR_PROSPEO_API_KEY"
+PROSPEO_API_KEY = os.environ.get("PROSPEO_API_KEY", "")
 PROSPEO_BASE_URL = "https://api.prospeo.io"
-TOKEN_PATH = "~/.google/token.json"
-CREDS_PATH = "~/.google/credentials.json"
+TOKEN_PATH = os.path.expanduser(os.environ.get("GOOGLE_TOKEN_PATH", "~/.google/token.json"))
+CREDS_PATH = os.path.expanduser(os.environ.get("GOOGLE_CREDENTIALS_PATH", "~/.google/credentials.json"))
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
 RESULTS_HEADER = [
@@ -93,28 +93,48 @@ def search_companies(filters: dict, page: int = 1) -> dict:
     })
 
 
+def _nested_or_flat(company: dict, container: str, *keys: str) -> str:
+    """Read a field that may be nested under `container` (e.g. location/funding)
+    or flat on the company object, depending on the API response shape."""
+    sub = company.get(container)
+    if isinstance(sub, dict):
+        for k in keys:
+            v = sub.get(k)
+            if v not in (None, ""):
+                return v
+    for k in keys:
+        v = company.get(k)
+        if v not in (None, ""):
+            return v
+    return ""
+
+
 def extract_company_row(company: dict) -> list:
-    """Extract a single company into a row matching RESULTS_HEADER."""
-    loc = company.get("location", {}) or {}
-    fund = company.get("funding", {}) or {}
-    keywords = company.get("keywords", []) or []
+    """Extract a single company into a row matching RESULTS_HEADER.
+
+    Location and funding fields can arrive nested (company["location"]["city"])
+    or flat (company["city"]); this handles both so columns don't silently blank.
+    """
+    keywords = company.get("keywords") or []
+    if not isinstance(keywords, list):
+        keywords = []
 
     return [
         company.get("name", ""),
-        company.get("domain", "") or company.get("website", ""),
+        company.get("domain") or company.get("website") or company.get("primary_domain") or "",
         company.get("industry", ""),
         company.get("employee_count", ""),
         company.get("employee_range", ""),
-        loc.get("city", "") or "",
-        loc.get("state", "") or "",
-        loc.get("country", "") or "",
+        _nested_or_flat(company, "location", "city"),
+        _nested_or_flat(company, "location", "state"),
+        _nested_or_flat(company, "location", "country"),
         company.get("revenue_range_printed", ""),
-        fund.get("last_funding_type", "") if isinstance(fund, dict) else "",
-        fund.get("total_funding", "") if isinstance(fund, dict) else "",
-        fund.get("last_funding_date", "") if isinstance(fund, dict) else "",
-        company.get("linkedin_url", "") or "",
+        _nested_or_flat(company, "funding", "last_funding_type"),
+        _nested_or_flat(company, "funding", "total_funding"),
+        _nested_or_flat(company, "funding", "last_funding_date"),
+        company.get("linkedin_url", ""),
         ", ".join(keywords[:15]),
-        company.get("founded", "") or "",
+        company.get("founded", ""),
     ]
 
 
@@ -126,15 +146,15 @@ def get_gspread_client() -> gspread.Client:
             creds.refresh(AuthRequest())
             Path(TOKEN_PATH).write_text(creds.to_json())
         else:
-            print("ERROR: Token expired and cannot refresh. Re-authenticate:")
-            print(f"  rm {TOKEN_PATH}")
-            print(f"  CREDENTIALS_PATH={CREDS_PATH} TOKEN_PATH={TOKEN_PATH} mcp-google-sheets --auth")
+            print(f"ERROR: Google token at {TOKEN_PATH} is expired and cannot refresh.")
+            print(f"  Delete it and re-run your Google OAuth flow to regenerate the token,")
+            print(f"  using the client credentials at {CREDS_PATH}.")
             sys.exit(1)
     return gspread.authorize(creds)
 
 
-def build_filter_summary(filters: dict) -> list[list]:
-    """Build human-readable filter summary for Search Info tab."""
+def build_filter_summary(filters: dict) -> list:
+    """Build human-readable filter summary for the Search Info tab."""
     rows = [["Field", "Value"]]
 
     mapping = {
@@ -171,7 +191,7 @@ def build_filter_summary(filters: dict) -> list[list]:
     return rows
 
 
-def write_results(spreadsheet_id: str, tab_name: str, rows: list[list], gc: gspread.Client):
+def write_results(spreadsheet_id: str, tab_name: str, rows: list, gc: gspread.Client):
     """Write company rows to the Results tab in batches."""
     sh = gc.open_by_key(spreadsheet_id)
 
@@ -208,7 +228,7 @@ def write_results(spreadsheet_id: str, tab_name: str, rows: list[list], gc: gspr
                 except Exception as e2:
                     print(f"    ERROR row {row_num}: {e2}")
 
-        # Rate limit: 60 requests/min for Google Sheets API
+        # Google Sheets API allows ~60 writes/min - pace the batches
         if i + batch_size < len(rows):
             time.sleep(1)
 
@@ -238,6 +258,37 @@ def write_search_info(spreadsheet_id: str, filters: dict, total_companies: int,
     print(f"  Search Info tab written ({len(info_rows)} rows)")
 
 
+def write_records_jsonl(path: Path, rows: list, filters: dict):
+    """Write shared-format records.jsonl for downstream skills."""
+    # Build a human-readable list of filters that matched
+    filter_labels = []
+    for key, val in filters.items():
+        label = key.replace("company_", "").replace("_", " ").title()
+        if isinstance(val, dict):
+            inc = val.get("include", [])
+            if inc:
+                filter_labels.append(f"{label}: {', '.join(str(v) for v in inc)}")
+            elif val.get("status"):
+                filter_labels.append(f"{label}: {val['status']}")
+            else:
+                filter_labels.append(label)
+        elif isinstance(val, list):
+            filter_labels.append(f"{label}: {', '.join(str(v) for v in val)}")
+        else:
+            filter_labels.append(f"{label}: {val}")
+
+    with open(path, "w") as f:
+        for row in rows:
+            record = {
+                "company": row[0],  # Company name
+                "domain": row[1],   # Domain
+                "person": None,
+                "filters_matched": filter_labels,
+            }
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    print(f"  records.jsonl: {len(rows)} records written to {path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Export Prospeo search results to Google Sheets")
     parser.add_argument("--filters", required=True, help="Path to filters JSON file")
@@ -246,6 +297,10 @@ def main():
     parser.add_argument("--max-pages", type=int, default=1000, help="Max pages to fetch (default: 1000)")
     parser.add_argument("--dry-run", action="store_true", help="Preview filters and count without exporting")
     args = parser.parse_args()
+
+    if not PROSPEO_API_KEY:
+        print("ERROR: Set the PROSPEO_API_KEY environment variable.")
+        sys.exit(1)
 
     # Load filters
     filters_path = Path(args.filters)
@@ -266,7 +321,7 @@ def main():
     print(f"  Plan: {resp['current_plan']} | Credits: {credits_start}")
 
     # First page to get total count
-    print(f"\nFetching page 1...")
+    print("\nFetching page 1...")
     result = search_companies(filters, page=1)
     if result.get("error"):
         print(f"ERROR: Search failed: {result.get('error_code', result)}")
@@ -314,7 +369,7 @@ def main():
     print(f"\n  Fetched {len(all_rows)} companies using {credits_used} credits")
 
     # Google Sheets auth
-    print(f"\nConnecting to Google Sheets...")
+    print("\nConnecting to Google Sheets...")
     gc = get_gspread_client()
 
     # Create or open spreadsheet
@@ -322,7 +377,6 @@ def main():
         spreadsheet_id = args.spreadsheet_id
         print(f"  Using existing spreadsheet: {spreadsheet_id}")
     else:
-        # Build a short summary for the title
         loc = filters.get("company_location_search", {}).get("include", [""])[0] if isinstance(filters.get("company_location_search"), dict) else ""
         ind = filters.get("company_industry", {}).get("include", [""])[0][:20] if isinstance(filters.get("company_industry"), dict) else ""
         hc = ", ".join(filters.get("company_headcount_range", [])) if isinstance(filters.get("company_headcount_range"), list) else ""
@@ -333,7 +387,7 @@ def main():
         print(f"  ID: {spreadsheet_id}")
 
     # Write Search Info tab first
-    print(f"\nWriting Search Info tab...")
+    print("\nWriting Search Info tab...")
     acct_after = get_account_info()
     credits_remaining = acct_after.get("response", {}).get("remaining_credits", credits_start - credits_used)
     write_search_info(spreadsheet_id, filters, total_count, pages_to_fetch, credits_used, credits_remaining, gc)
@@ -343,13 +397,18 @@ def main():
     print(f"\nWriting {len(all_rows)} companies to '{tab_name}' tab...")
     total_written = write_results(spreadsheet_id, tab_name, all_rows, gc)
 
+    # Write records.jsonl for downstream skills
+    jsonl_path = Path(args.filters).parent / "records.jsonl"
+    write_records_jsonl(jsonl_path, all_rows, filters)
+
     # Summary
     print(f"\n{'=' * 50}")
-    print(f"Export complete!")
+    print("Export complete!")
     print(f"  Companies: {total_written}/{len(all_rows)}")
     print(f"  Credits used: {credits_used}")
     print(f"  Credits remaining: {credits_remaining}")
     print(f"  Sheet: https://docs.google.com/spreadsheets/d/{spreadsheet_id}")
+    print(f"  JSONL: {jsonl_path}")
 
 
 if __name__ == "__main__":

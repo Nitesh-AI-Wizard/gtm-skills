@@ -527,6 +527,9 @@ def run_batch(domains: list[str], mode: str, run_dir: Path | None = None,
         if i < len(pending) - 1:
             time.sleep(delay)
 
+    # Write records.jsonl for downstream skills
+    write_records_jsonl(run_dir, tracker)
+
     # Final summary
     print(f"\n{'='*60}")
     print(f"BATCH COMPLETE")
@@ -537,6 +540,37 @@ def run_batch(domains: list[str], mode: str, run_dir: Path | None = None,
     print(f"{'='*60}")
 
     return run_dir
+
+
+def write_records_jsonl(run_dir: Path, tracker: dict):
+    """Write shared-format records.jsonl for downstream skills."""
+    scans_dir = run_dir / "scans"
+    jsonl_path = run_dir / "records.jsonl"
+    count = 0
+
+    with open(jsonl_path, "w") as f:
+        for domain, info in tracker["domains"].items():
+            if info.get("status") not in ("success", "partial"):
+                continue
+
+            # Read the scan JSON to extract page types found
+            safe_name = domain.replace("/", "_").replace(":", "")
+            scan_path = scans_dir / f"{safe_name}.json"
+            pages_found = []
+            if scan_path.exists():
+                scan = json.loads(scan_path.read_text())
+                pages_found = [f"has_{pt}" for pt in scan.get("pages", {}).keys()]
+
+            record = {
+                "company": domain,  # Best we have at this layer
+                "domain": domain,
+                "person": None,
+                "filters_matched": pages_found,
+            }
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            count += 1
+
+    print(f"  records.jsonl: {count} records written to {jsonl_path}")
 
 
 def load_domains_from_file(path: str) -> list[str]:
@@ -596,7 +630,7 @@ def main():
         run_dir = run_batch(domains, args.mode, map_limit=args.map_limit,
                             delay=args.delay)
         print(f"\nTo write results to Google Sheet, run:")
-        print(f"  python3 .claude/skills/firecrawl-research/scripts/sheets_writer.py \\")
+        print(f"  python3 scripts/sheets_writer.py \\")
         print(f"    --run-dir {run_dir} \\")
         print(f"    --spreadsheet-id <SHEET_ID>")
         return
@@ -611,6 +645,9 @@ def main():
     scan_path = run_dir / "scans" / f"{safe_name}.json"
     scan_path.write_text(json.dumps(result, indent=2))
     update_tracker(run_dir, tracker, args.domain, result["status"], result["credits_used"])
+
+    # Write records.jsonl for downstream skills
+    write_records_jsonl(run_dir, tracker)
 
     print(f"\nSaved to: {scan_path}")
     print(f"Run folder: {run_dir}")

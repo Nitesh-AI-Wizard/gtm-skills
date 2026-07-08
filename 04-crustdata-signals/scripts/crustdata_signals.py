@@ -333,6 +333,62 @@ def process_domain(domain: str, hire_days: int, headers: dict, output_dir: Path,
     save_tracker(output_dir, tracker)
 
 
+def write_records_jsonl(output_dir: Path, tracker: dict):
+    """Write shared-format records.jsonl for downstream skills."""
+    jsonl_path = output_dir / "records.jsonl"
+    count = 0
+
+    with open(jsonl_path, "w") as f:
+        for domain, info in tracker["domains"].items():
+            if info.get("status") != "done":
+                continue
+
+            # Read the domain JSON for company name and signal summary
+            json_path = output_dir / f"{domain.replace('.', '_')}.json"
+            company_name = domain
+            signals = []
+
+            if json_path.exists():
+                data = json.loads(json_path.read_text())
+
+                # Extract company name from enrich data
+                matches = data.get("enrich", {}).get("matches", [])
+                if matches and matches[0].get("company_data"):
+                    cd = matches[0]["company_data"]
+                    basic = cd.get("basic_info", {})
+                    company_name = basic.get("name") or domain
+
+                    # Build signal labels from what was found
+                    funding = cd.get("funding", {})
+                    if funding and funding.get("funding_rounds"):
+                        latest = funding["funding_rounds"][0]
+                        signals.append(f"{latest.get('round_type', 'Funding')} {latest.get('money_raised_formatted', '')}")
+
+                    headcount = cd.get("headcount", {})
+                    if headcount:
+                        current = headcount.get("current_employee_count")
+                        yoy = headcount.get("employee_count_yoy_growth_rate_percentage")
+                        if current:
+                            signals.append(f"{current} employees")
+                        if yoy:
+                            signals.append(f"{yoy}% YoY growth")
+
+                hires = data.get("recent_hires", [])
+                if hires:
+                    signals.append(f"{len(hires)} recent hires")
+
+            record = {
+                "company": company_name,
+                "domain": domain,
+                "person": None,
+                "filters_matched": signals,
+            }
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            count += 1
+
+    print(f"  records.jsonl: {count} records written to {jsonl_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Pull company signals from CrustData")
     # Input sources
@@ -415,6 +471,9 @@ def main():
     for i, domain in enumerate(domains, 1):
         print(f"[{i}/{len(domains)}] {domain}")
         process_domain(domain, args.hire_days, headers, output_dir, tracker)
+
+    # Write records.jsonl for downstream skills
+    write_records_jsonl(output_dir, tracker)
 
     # Final summary
     tracker["status"] = "completed"

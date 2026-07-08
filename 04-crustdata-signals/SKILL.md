@@ -28,7 +28,7 @@ and column contain the domains.
 ## Prerequisites
 
 - `CRUSTDATA_API_KEY` env var — get your API key from the [CrustData dashboard](https://crustdata.com)
-- Python packages: `requests`, `gspread`, `google-auth`
+- Python packages: `pip install -r ../_shared/requirements.txt` (Sheets export uses the optional `gspread`/`google-auth` extras)
 - Google Sheets OAuth2 token at `~/.google/token.json`
 
 ## Credit rules
@@ -137,6 +137,19 @@ The sheets writer auto-generates signal text:
 - Department timeseries uses `employee_count` as the key (not `headcount`).
 - Some companies return `updated_at: null` — a genuine coverage gap, not staleness.
 - Rate limiting is handled automatically with conservative delays.
+
+## Shared output (records.jsonl)
+
+After enrichment completes, the script writes a `records.jsonl` file to the output
+directory. Each line is one domain in the shared record format consumed by
+downstream skills (signal-builder, resolution):
+
+```jsonl
+{"company": "Serve Robotics", "domain": "serverobotics.com", "person": null, "filters_matched": ["Series B $56M", "350 employees", "42% YoY growth", "18 recent hires"]}
+```
+
+The `filters_matched` field summarizes the key signals found. This file is
+additive - existing per-domain JSONs, tracker, and Sheet outputs are unchanged.
 
 ## References
 
