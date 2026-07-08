@@ -1,0 +1,114 @@
+{
+  "skill_name": "firecrawl-research",
+  "evals": [
+    {
+      "id": 1,
+      "type": "Type 1 - Single domain, default mode",
+      "prompt": "Scrape acme.com",
+      "expected_output": "Runs standard mode scrape without asking for mode, returns page-typed markdown with summary.",
+      "files": [],
+      "expectations": [
+        "Defaults to standard mode without asking clarifying questions",
+        "Runs firecrawl_scrape.py with --domain acme.com --mode standard",
+        "Map runs first (1 credit) to discover site URLs",
+        "Classifies URLs into page types using PAGE_PATTERNS",
+        "Scrapes only the best-match URL per page type (not all URLs)",
+        "JSON scan saved to runs/<run-id>/scans/acme.com.json",
+        "Tracker updated with status, credits used, pages scraped",
+        "Shows summary: pages found, pages scraped, credits used, status",
+        "Offers to write results to Google Sheet"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "Type 2 - Single domain, extract mode with cost warning",
+      "prompt": "Extract structured data from stripe.com",
+      "expected_output": "Uses extract mode with default schema, warns about ~20+ credit cost before proceeding.",
+      "files": [],
+      "expectations": [
+        "Recognizes this as extract mode",
+        "Warns that extract mode costs ~20+ credits (not 1) before proceeding",
+        "Waits for user confirmation before running",
+        "Uses default schema: founder, headcount_clues, tech_mentions, funding_clues, product_category, customers_mentioned, partners, investors, year_founded, locations",
+        "Runs firecrawl_scrape.py with --mode extract",
+        "Returns structured JSON with extracted fields",
+        "Offers custom schema option if user wants different fields"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "Type 3 - Batch with cost gate",
+      "prompt": "Scrape these 60 domains from domains.txt in standard mode",
+      "expected_output": "Detects batch >50, shows estimated credits and cost, asks confirmation before running.",
+      "files": [],
+      "expectations": [
+        "Detects batch size >50 domains",
+        "Estimates total credits: 60 x ~6 = ~360 credits",
+        "Calculates estimated cost: 360 x $0.001 = $0.36 (Standard plan)",
+        "Shows estimate and asks for confirmation before proceeding",
+        "Runs with --batch domains.txt --mode standard",
+        "Tracker handles partial failures gracefully",
+        "Shows progress during batch processing",
+        "Final summary shows completed/failed/skipped counts and total credits"
+      ]
+    },
+    {
+      "id": 4,
+      "type": "Type 4 - Resume interrupted batch",
+      "prompt": "Resume the scrape from runs/2026-07-08-batch",
+      "expected_output": "Reads existing tracker, skips completed domains, processes only remaining ones.",
+      "files": [],
+      "expectations": [
+        "Runs with --resume runs/2026-07-08-batch",
+        "Reads existing tracker.json to identify completed domains",
+        "Skips already-completed domains (no duplicate credit spend)",
+        "Only spends credits on remaining/failed domains",
+        "Updates tracker incrementally as each domain completes",
+        "Shows final summary with total completed across both sessions"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "Type 5 - Ambiguous mode selection",
+      "prompt": "Get everything you can from beta.io",
+      "expected_output": "Recognizes ambiguity between deep and extract, asks user to pick a mode.",
+      "files": [],
+      "expectations": [
+        "Does NOT default to standard - 'everything' signals more than default",
+        "Identifies two possible interpretations: deep (~11 credits, more page types) vs extract (~20+ credits, structured LLM extraction)",
+        "Explains the difference between deep and extract modes",
+        "Asks user which mode they want before running",
+        "Runs only after user confirms mode choice"
+      ]
+    },
+    {
+      "id": 6,
+      "type": "Type 6 - Google Sheets output",
+      "prompt": "Scrape example.com and write results to this sheet: https://docs.google.com/spreadsheets/d/ABC123/edit",
+      "expected_output": "Scrapes domain, then writes results to the specified Google Sheet using sheets_writer.py.",
+      "files": [],
+      "expectations": [
+        "Extracts spreadsheet ID ABC123 from URL",
+        "Runs firecrawl_scrape.py first with --domain example.com --mode standard",
+        "After scrape completes, runs sheets_writer.py with --run-dir and --spreadsheet-id ABC123",
+        "Sheet columns match spec: Domain, Status, Mode, Date, URLs Found, Pages Scraped, Credits Used, then page content columns",
+        "Does NOT use Google Sheets MCP for writing (fails on large content)"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "Type 7 - Large batch hard stop",
+      "prompt": "Scrape 600 domains from big-list.txt in deep mode",
+      "expected_output": "Estimates cost over $10, triggers hard stop requiring explicit user approval.",
+      "files": [],
+      "expectations": [
+        "Detects batch size >500 domains",
+        "Suggests switching to minimal mode to reduce cost",
+        "Estimates credits: 600 x ~11 (deep) = ~6,600 credits",
+        "Calculates cost: 6,600 x $0.001 = $6.60 or notes it could be higher with stealth proxy",
+        "Requires explicit user approval before proceeding",
+        "Does NOT start scraping until user confirms"
+      ]
+    }
+  ]
+}
