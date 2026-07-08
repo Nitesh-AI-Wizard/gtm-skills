@@ -140,7 +140,7 @@ Credit tracking rules — these prevent silent cost overruns:
 | Credits running low | Switch to minimal mode |
 | Sheet writer auth fails | Re-auth: `rm ~/.google/token.json` then re-run |
 | Interrupted batch | Resume with `--resume <run-folder-path>` |
-| Script import error | `pip install firecrawl-py python-dotenv gspread google-auth` |
+| Script import error | `pip install -r ../_shared/requirements.txt` |
 
 ## Auth
 

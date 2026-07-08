@@ -150,8 +150,8 @@ DEFAULT_EXTRACT_SCHEMA = {
     },
 }
 
-# Default run folder base
-RUN_FOLDER_BASE = Path(".claude/skills/firecrawl-research/runs")
+# Default run folder base — resolve relative to this skill dir (scripts/ -> skill -> runs/)
+RUN_FOLDER_BASE = Path(__file__).resolve().parent.parent / "runs"
 
 
 # ---------------------------------------------------------------------------
